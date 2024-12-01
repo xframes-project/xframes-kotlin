@@ -21,6 +21,8 @@ dependencies {
 
     // This dependency is used by the application.
     implementation libs.guava
+
+    implementation 'org.json:json:20210307' // Use the latest version
 }
 
 java {
@@ -40,7 +42,7 @@ task runMain(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     args = []
     // todo: // ensure DLLs are moved to a consistent path across operating systems
-    jvmArgs = ['-Djava.library.path=./native/build/Debug']
+    jvmArgs = ['-Djava.library.path=C:\\dev\\xframes-kotlin\\native']
 }
 
 application {
@@ -51,4 +53,26 @@ application {
 tasks.named('test') {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'dev.xframes.XFramesWrapperKt'
+        )
+    }
+}
+
+// To include Kotlin stdlib in the final JAR
+task fatJar(type: Jar) {
+    from sourceSets.main.output
+    configurations.runtimeClasspath.each { file ->
+        from zipTree(file)
+    }
+    manifest {
+        attributes 'Main-Class': 'dev.xframes.XFramesWrapperKt' // Replace with your main class
+    }
+
+    // Set the duplicate handling strategy
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
