@@ -1,7 +1,17 @@
 package dev.xframes
 
-import org.json.JSONArray
-import org.json.JSONObject
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.JsonClass
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+
+@JsonClass(generateAdapter = true)
+data class Node(
+    val id: Int,
+    val type: String,
+    val root: Boolean? = null,
+    val text: String? = null
+)
 
 object MyCallbackHandler : AllCallbacks {
     lateinit var xframes: XFramesWrapper
@@ -14,24 +24,34 @@ object MyCallbackHandler : AllCallbacks {
     override fun onInit() {
         println("Initialization callback called!")
 
-        // Create root node
-        val rootNode = JSONObject().apply {
-            put("id", 0)
-            put("type", "node")
-            put("root", true)
-        }
+        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+        val nodeAdapter = moshi.adapter(Node::class.java)
 
-        // Create text node
-        val textNode = JSONObject().apply {
-            put("id", 1)
-            put("type", "unformatted-text")
-            put("text", "Hello, world!")
-        }
+        val childrenAdapter: JsonAdapter<List<*>>? = moshi.adapter(List::class.java)
 
-        // Set elements
-        xframes.setElement(rootNode.toString())
-        xframes.setElement(textNode.toString())
-        xframes.setChildren(0, JSONArray().put(1).toString())
+        val rootNode = Node(
+            id = 0,
+            type = "node",
+            root = true
+        )
+        val rootNodeJson = nodeAdapter.toJson(rootNode)
+
+        val textNode = Node(
+            id = 1,
+            type = "unformatted-text",
+            text = "Hello, world!"
+        )
+        val textNodeJson = nodeAdapter.toJson(textNode)
+
+        val children = listOf(1)
+
+        val childrenJson = childrenAdapter?.toJson(children)
+
+        xframes.setElement(rootNodeJson)
+        xframes.setElement(textNodeJson)
+        if (childrenJson != null) {
+            xframes.setChildren(0, childrenJson)
+        }
     }
 
     override fun onTextChanged(id: Int, text: String) {

@@ -1,7 +1,20 @@
 package dev.xframes
 
-import org.json.JSONObject
+import com.squareup.moshi.JsonClass
+import com.squareup.moshi.Moshi
 import java.util.concurrent.*
+
+@JsonClass(generateAdapter = true)
+data class FontDefinition(val name: String, val size: Int)
+
+@JsonClass(generateAdapter = true)
+data class FontDefinitions(val defs: List<FontDefinition>)
+
+@JsonClass(generateAdapter = true)
+data class ColorValue(val color: String, val alpha: Int)
+
+@JsonClass(generateAdapter = true)
+data class Theme(val colors: Map<Int, List<Any>>)
 
 class XFramesWrapper {
     external fun setElement(elementJson: String)
@@ -41,8 +54,6 @@ class XFramesWrapper {
 
 // Main function defined outside the class
 fun main() {
-    println("Start!")
-
     val xframes = XFramesWrapper()
 
     MyCallbackHandler.initialize(xframes)
@@ -69,103 +80,90 @@ fun keepProcessRunning() {
 
 // Returns font definitions as a JSON string
 fun getFontDefinitions(): String {
-    val fontDefs = JSONObject()
-    val defs = mutableListOf<Map<String, Any>>()
-    val entry = mutableMapOf<String, Any>()
-    entry["name"] = "roboto-regular"
-    entry["sizes"] = listOf(16, 18, 20, 24, 28, 32, 36, 48)
-    defs.add(entry)
+    val moshi = Moshi.Builder().build()
+    val adapter = moshi.adapter(FontDefinitions::class.java)
 
-    // Flatten font definitions
-    val flattenedDefs = mutableListOf<Map<String, Any>>()
-    for (fontEntry in defs) {
-        val fontName = fontEntry["name"] as String
-        val sizes = fontEntry["sizes"] as List<Int>
+    val sizes = listOf(16, 18, 20, 24, 28, 32, 36, 48)
+    val definitions = sizes.map { FontDefinition("roboto-regular", it) }
+    val fontDefinitions = FontDefinitions(definitions)
 
-        for (size in sizes) {
-            val fontDef = mutableMapOf<String, Any>()
-            fontDef["name"] = fontName
-            fontDef["size"] = size
-            flattenedDefs.add(fontDef)
-        }
-    }
-
-    fontDefs.put("defs", flattenedDefs)
-
-    return fontDefs.toString()
+    return adapter.toJson(fontDefinitions)
 }
 
 // Returns style overrides as a JSON string
 fun getStyleOverrides(): String {
-    val theme2Colors = mutableMapOf<String, String>()
-    theme2Colors["darkestGrey"] = "#141f2c"
-    theme2Colors["darkerGrey"] = "#2a2e39"
-    theme2Colors["darkGrey"] = "#363b4a"
-    theme2Colors["lightGrey"] = "#5a5a5a"
-    theme2Colors["lighterGrey"] = "#7A818C"
-    theme2Colors["evenLighterGrey"] = "#8491a3"
-    theme2Colors["black"] = "#0A0B0D"
-    theme2Colors["green"] = "#75f986"
-    theme2Colors["red"] = "#ff0062"
-    theme2Colors["white"] = "#fff"
+    val moshi = Moshi.Builder().build()
+    val adapter = moshi.adapter(Theme::class.java)
 
-    val theme2 = mutableMapOf<String, Any>()
-    val colorMap = mutableMapOf<Int, Any>()
-    colorMap[XFramesWrapper.ImGuiCol.Text.value] = listOf(theme2Colors["white"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TextDisabled.value] = listOf(theme2Colors["lighterGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.WindowBg.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ChildBg.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.PopupBg.value] = listOf(theme2Colors["white"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.Border.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.BorderShadow.value] = listOf(theme2Colors["darkestGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.FrameBg.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.FrameBgHovered.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.FrameBgActive.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TitleBg.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TitleBgActive.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TitleBgCollapsed.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.MenuBarBg.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ScrollbarBg.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ScrollbarGrab.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ScrollbarGrabHovered.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ScrollbarGrabActive.value] = listOf(theme2Colors["darkestGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.CheckMark.value] = listOf(theme2Colors["darkestGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.SliderGrab.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.SliderGrabActive.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.Button.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ButtonHovered.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ButtonActive.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.Header.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.HeaderHovered.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.HeaderActive.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.Separator.value] = listOf(theme2Colors["darkestGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.SeparatorHovered.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.SeparatorActive.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ResizeGrip.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ResizeGripHovered.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ResizeGripActive.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.Tab.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TabHovered.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TabActive.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TabUnfocused.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TabUnfocusedActive.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.PlotLines.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.PlotLinesHovered.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.PlotHistogram.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.PlotHistogramHovered.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TableHeaderBg.value] = listOf(theme2Colors["black"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TableBorderStrong.value] = listOf(theme2Colors["lightGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TableBorderLight.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TableRowBg.value] = listOf(theme2Colors["darkGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TableRowBgAlt.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.TextSelectedBg.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.DragDropTarget.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.NavHighlight.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.NavWindowingHighlight.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.NavWindowingDimBg.value] = listOf(theme2Colors["darkerGrey"], 1)
-    colorMap[XFramesWrapper.ImGuiCol.ModalWindowDimBg.value] = listOf(theme2Colors["darkerGrey"], 1)
+    val theme2Colors = mapOf(
+        "darkestGrey" to "#141f2c",
+        "darkerGrey" to "#2a2e39",
+        "darkGrey" to "#363b4a",
+        "lightGrey" to "#5a5a5a",
+        "lighterGrey" to "#7A818C",
+        "evenLighterGrey" to "#8491a3",
+        "black" to "#0A0B0D",
+        "green" to "#75f986",
+        "red" to "#ff0062",
+        "white" to "#fff"
+    )
 
-    theme2["colors"] = colorMap
+    val colorMap = mapOf(
+        XFramesWrapper.ImGuiCol.Text.value to listOf(theme2Colors["white"]!!, 1),
+        XFramesWrapper.ImGuiCol.TextDisabled.value to listOf(theme2Colors["lighterGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.WindowBg.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.ChildBg.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.PopupBg.value to listOf(theme2Colors["white"]!!, 1),
+        XFramesWrapper.ImGuiCol.Border.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.BorderShadow.value to listOf(theme2Colors["darkestGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.FrameBg.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.FrameBgHovered.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.FrameBgActive.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TitleBg.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TitleBgActive.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TitleBgCollapsed.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.MenuBarBg.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ScrollbarBg.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ScrollbarGrab.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ScrollbarGrabHovered.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ScrollbarGrabActive.value to listOf(theme2Colors["darkestGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.CheckMark.value to listOf(theme2Colors["darkestGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.SliderGrab.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.SliderGrabActive.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.Button.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.ButtonHovered.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ButtonActive.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.Header.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.HeaderHovered.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.HeaderActive.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.Separator.value to listOf(theme2Colors["darkestGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.SeparatorHovered.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.SeparatorActive.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ResizeGrip.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.ResizeGripHovered.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ResizeGripActive.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.Tab.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.TabHovered.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TabActive.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TabUnfocused.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.TabUnfocusedActive.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.PlotLines.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.PlotLinesHovered.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.PlotHistogram.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.PlotHistogramHovered.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TableHeaderBg.value to listOf(theme2Colors["black"]!!, 1),
+        XFramesWrapper.ImGuiCol.TableBorderStrong.value to listOf(theme2Colors["lightGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TableBorderLight.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TableRowBg.value to listOf(theme2Colors["darkGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TableRowBgAlt.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.TextSelectedBg.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.DragDropTarget.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.NavHighlight.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.NavWindowingHighlight.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.NavWindowingDimBg.value to listOf(theme2Colors["darkerGrey"]!!, 1),
+        XFramesWrapper.ImGuiCol.ModalWindowDimBg.value to listOf(theme2Colors["darkerGrey"]!!, 1)
+    )
 
-    return JSONObject(theme2).toString()
+    val theme = Theme(colors = colorMap)
+    return adapter.toJson(theme)
 }

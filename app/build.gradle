@@ -2,6 +2,8 @@ plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     alias(libs.plugins.kotlin.jvm)
 
+    id 'org.jetbrains.kotlin.kapt' version '1.9.0' // Kotlin KAPT plugin
+
     // Apply the application plugin to add support for building a CLI application in Java.
     id 'application'
 }
@@ -22,7 +24,13 @@ dependencies {
     // This dependency is used by the application.
     implementation libs.guava
 
-    implementation 'org.json:json:20210307' // Use the latest version
+    implementation 'com.squareup.moshi:moshi:1.15.0' // Add Moshi core library
+    implementation 'com.squareup.moshi:moshi-kotlin:1.15.0' // Add Moshi Kotlin support
+    kapt 'com.squareup.moshi:moshi-kotlin-codegen:1.15.0' // Enable code generation for Moshi adapters
+}
+
+kapt {
+    correctErrorTypes = true
 }
 
 java {
