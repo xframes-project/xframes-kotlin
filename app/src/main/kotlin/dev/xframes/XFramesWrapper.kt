@@ -1,11 +1,9 @@
 package dev.xframes
 
 import org.json.JSONObject
-import java.util.*
 import java.util.concurrent.*
 
 class XFramesWrapper {
-    // Native method declarations
     external fun setElement(elementJson: String)
     external fun setChildren(parentId: Int, childrenJson: String)
     external fun init(
@@ -44,9 +42,6 @@ class XFramesWrapper {
 // Main function defined outside the class
 fun main() {
     println("Start!")
-
-    val clazz = Class.forName("dev.xframes.MyCallbackHandler")
-    println("Class found: $clazz")
 
     val xframes = XFramesWrapper()
 
