@@ -25,9 +25,9 @@ object MyCallbackHandler : AllCallbacks {
         println("Initialization callback called!")
 
         val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-        val nodeAdapter = moshi.adapter(Node::class.java)
 
-        val childrenAdapter: JsonAdapter<List<*>>? = moshi.adapter(List::class.java)
+        val nodeAdapter = moshi.adapter(Node::class.java)
+        val childrenAdapter = moshi.adapter(List::class.java).lenient()
 
         val rootNode = Node(
             id = 0,
@@ -44,8 +44,7 @@ object MyCallbackHandler : AllCallbacks {
         val textNodeJson = nodeAdapter.toJson(textNode)
 
         val children = listOf(1)
-
-        val childrenJson = childrenAdapter?.toJson(children)
+        val childrenJson = childrenAdapter.toJson(children)
 
         xframes.setElement(rootNodeJson)
         xframes.setElement(textNodeJson)
