@@ -40,7 +40,7 @@ No need to run batch/bash files if you already installed gradle globally
 
 ### Generate a 'fat' JAR file using Gradle
 
-This is plug and play, though OS dependent due to the JNI library
+This is almost plug and play, though OS dependent due to the JNI library. At the moment the system Path still needs to be updated.
 
 `.\gradelw.bat fatJar`
 
