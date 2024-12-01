@@ -1,0 +1,54 @@
+plugins {
+    // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
+    alias(libs.plugins.kotlin.jvm)
+
+    // Apply the application plugin to add support for building a CLI application in Java.
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Use the Kotlin JUnit 5 integration.
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
+
+    // Use the JUnit 5 integration.
+    testImplementation libs.junit.jupiter.engine
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // This dependency is used by the application.
+    implementation libs.guava
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(22))
+    }
+}
+
+kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(22))
+    }
+}
+
+task runMain(type: JavaExec) {
+    mainClass = 'dev.xframes.XFramesWrapperKt'
+    classpath = sourceSets.main.runtimeClasspath
+    args = []
+    // todo: // ensure DLLs are moved to a consistent path across operating systems
+    jvmArgs = ['-Djava.library.path=./native/build/Debug']
+}
+
+application {
+    // Define the main class for the application.
+    mainClass = 'dev.xframes.XFramesWrapperKt'
+}
+
+tasks.named('test') {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
+}
