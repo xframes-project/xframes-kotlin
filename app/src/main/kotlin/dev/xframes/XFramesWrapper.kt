@@ -61,6 +61,20 @@ fun main() {
     // Initialize with paths and callbacks
     xframes.init("../assets", getFontDefinitions(), getStyleOverrides(), MyCallbackHandler)
 
+    // Use the declarative API to create the view tree
+    val view = view(1, "div", mapOf("style" to "color: red")) {
+        child(2, "button", mapOf("label" to "Click me")) {
+            // This button can have its own children (if necessary)
+        }
+        child(3, "span", mapOf("text" to "Hello World!"))
+    }
+
+    // Render the component tree
+    val renderedView = view.render()
+
+    // Print the rendered view (tree structure)
+    println(renderedView)
+
     // Start periodic task
     keepProcessRunning()
 }

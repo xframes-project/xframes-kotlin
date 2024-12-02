@@ -78,6 +78,15 @@ fun diffChildren(oldChildren: List<ComponentNode>, newChildren: List<ComponentNo
     return updates
 }
 
+fun componentToMap(component: ComponentNode): Map<String, Any?> {
+    return mapOf(
+        "id" to component.id,
+        "type" to component.type,
+        "props" to component.props,
+        "children" to component.children.map { componentToMap(it) }
+    )
+}
+
 fun requestFlush(updateQueue: UpdateQueue) {
     // In a real system, you'd want to flush based on some condition (e.g., a timer or user action)
     println("Flushing updates...")
