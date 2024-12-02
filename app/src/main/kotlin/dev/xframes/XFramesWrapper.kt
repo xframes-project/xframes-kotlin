@@ -59,7 +59,7 @@ fun main() {
     MyCallbackHandler.initialize(xframes)
 
     // Initialize with paths and callbacks
-    xframes.init("C:\\dev\\xframes-kotlin\\assets", getFontDefinitions(), getStyleOverrides(), MyCallbackHandler)
+    xframes.init("../assets", getFontDefinitions(), getStyleOverrides(), MyCallbackHandler)
 
     // Start periodic task
     keepProcessRunning()
