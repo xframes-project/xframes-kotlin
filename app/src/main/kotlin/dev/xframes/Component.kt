@@ -1,5 +1,9 @@
 package dev.xframes
 
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class ComponentAnn
+
 open class Component(
     val id: Int,
     val type: String,
