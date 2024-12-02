@@ -2,7 +2,12 @@ package dev.xframes
 
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import org.koin.core.context.startKoin
+import org.koin.dsl.module
 import java.util.concurrent.*
+
 
 @JsonClass(generateAdapter = true)
 data class FontDefinition(val name: String, val size: Int)
@@ -52,9 +57,28 @@ class XFramesWrapper {
     }
 }
 
+fun collectCounterState(counterService: CounterService) {
+    // Launch a coroutine in the global scope to observe the state flow
+    GlobalScope.launch {
+        counterService.state.collect { state ->
+            println("Current count: ${state.count}")  // Print the updated count
+        }
+    }
+}
+
 // Main function defined outside the class
 fun main() {
+    startKoin {
+        modules(appModule)
+    }
+
+    val counterService = CounterService()
+
+    // Collect state in a clean manner without using runBlocking
+    collectCounterState(counterService)
+
     val xframes = XFramesWrapper()
+
 
     MyCallbackHandler.initialize(xframes)
 
