@@ -31,6 +31,8 @@ dependencies {
 
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0'
 
+    implementation "io.reactivex.rxjava3:rxjava:3.1.10" // Core RxJava
+
     kapt 'com.squareup.moshi:moshi-kotlin-codegen:1.15.0' // Enable code generation for Moshi adapters
 }
 
