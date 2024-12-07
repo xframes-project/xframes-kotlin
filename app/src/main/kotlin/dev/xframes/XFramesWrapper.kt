@@ -1,8 +1,12 @@
 package dev.xframes
 
+import androidx.compose.runtime.*
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import java.util.concurrent.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlin.coroutines.CoroutineContext
 
 @JsonClass(generateAdapter = true)
 data class FontDefinition(val name: String, val size: Int)
@@ -52,14 +56,81 @@ class XFramesWrapper {
     }
 }
 
+data class WidgetNode(
+    var type: String,
+    var props: Map<String, Any?> = emptyMap(),
+    val children: MutableList<WidgetNode> = mutableListOf()
+)
+
+class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
+    override fun onClear() {
+        println("onClear")
+        current.children.clear()
+    }
+
+    override fun insertBottomUp(index: Int, instance: WidgetNode) {
+        println("insertBottomUp")
+        current.children.add(index, instance)
+    }
+
+    override fun insertTopDown(index: Int, instance: WidgetNode) {
+        println("insertTopDown")
+        current.children.add(index, instance)
+    }
+
+    override fun move(from: Int, to: Int, count: Int) {
+        println("move")
+        val moved = current.children.subList(from, from + count)
+        current.children.removeAll(moved)
+        current.children.addAll(to, moved)
+    }
+
+    override fun remove(index: Int, count: Int) {
+        println("remove")
+        current.children.subList(index, index + count).clear()
+    }
+}
+
+@Composable
+fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    ComposeNode<WidgetNode, WidgetTreeApplier>(
+        factory = { WidgetNode(type, props) },
+        update = {
+            set(type) { this.type = type }
+            set(props) { this.props = props }
+        },
+        content = content
+    )
+}
+
+fun buildWidgetTree(): WidgetNode {
+    val root = WidgetNode("root")
+    val applier = WidgetTreeApplier(root)
+    val composition = Composition(applier, Recomposer(MainScope().coroutineContext))
+
+    composition.setContent {
+        WidgetNodeComposable("Container") {
+            WidgetNodeComposable("Button", mapOf("text" to "Click Me"))
+        }
+    }
+
+    return root
+}
+
+
+
+
+
 // Main function defined outside the class
 fun main() {
+    buildWidgetTree()
+
     val xframes = XFramesWrapper()
 
     MyCallbackHandler.initialize(xframes)
 
     // Initialize with paths and callbacks
-    xframes.init("C:\\dev\\xframes-kotlin\\assets", getFontDefinitions(), getStyleOverrides(), MyCallbackHandler)
+    xframes.init("../assets", getFontDefinitions(), getStyleOverrides(), MyCallbackHandler)
 
     // Start periodic task
     keepProcessRunning()
