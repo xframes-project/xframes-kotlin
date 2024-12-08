@@ -98,38 +98,78 @@ class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
     val widgetNodeAdapter = moshi.adapter(WidgetNode::class.java)
 
     override fun onClear() {
-        println("onClear")
-        current.children.clear()
+        root.children.clear()
     }
 
-    override fun insertBottomUp(index: Int, instance: WidgetNode) {
-        val widgetNodeJson = widgetNodeAdapter.toJson(instance)
-        println("insertBottomUp: $widgetNodeJson")
-        current.children.add(index, instance)
-    }
+    override fun insertBottomUp(index: Int, instance: WidgetNode) {}
 
     override fun insertTopDown(index: Int, instance: WidgetNode) {
-        println("insertTopDown")
+        val parent = getWidgetById(index)
+        val widgetNodeJson = widgetNodeAdapter.toJson(instance)
+        val parentJson = widgetNodeAdapter.toJson(parent)
+        println("insertTopDown: $index $parentJson $widgetNodeJson")
+////        println(Thread.currentThread().stackTrace.joinToString("\n"))
+//        current.children.add(index, instance)
+
         current.children.add(index, instance)
     }
 
     override fun move(from: Int, to: Int, count: Int) {
-        println("move")
-        val moved = current.children.subList(from, from + count)
-        current.children.removeAll(moved)
-        current.children.addAll(to, moved)
+        current.children.move(from, to, count)
     }
 
     override fun remove(index: Int, count: Int) {
-        println("remove")
-        current.children.subList(index, index + count).clear()
+        current.children.remove(index, count)
+    }
+
+    override fun onBeginChanges() {
+        super.onBeginChanges()
+    }
+
+    override fun onEndChanges() {
+        super.onEndChanges()
+
+        val rootJson = widgetNodeAdapter.toJson(root)
+        println("done: $rootJson")
     }
 }
 
 @Composable
 fun Node(props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    println("Node recomposed")
+
+    val updatedProps = remember { props }
+
+    WidgetNodeComposable("node", updatedProps, content)
+}
+
+@Composable
+fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap()) {
+    println("UnformattedText recomposed")
+
+    val updatedProps = remember { props + mapOf("text" to text) }
+
+    WidgetNodeComposable("unformatted-text", updatedProps)
+}
+
+@Composable
+fun Button(label: String, props: Map<String, Any?> = emptyMap()) {
+    println("Button recomposed")
+
+    val updatedProps = remember { props + mapOf("label" to label) }
+
+    WidgetNodeComposable("button", updatedProps)
+}
+
+@Composable
+fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
     ComposeNode<WidgetNode, WidgetTreeApplier>(
-        factory = { WidgetNode("node", props) },
+        factory = {
+            val node = WidgetNode(type, props)
+            registerWidget(node.id, node)
+
+            node
+        },
         update = {
             set(props) { this.props = props }
         },
@@ -137,59 +177,20 @@ fun Node(props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit 
     )
 }
 
-@Composable
-fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
-    ComposeNode<WidgetNode, WidgetTreeApplier>(
-        factory = { WidgetNode("unformatted-text", props) },
-        update = {
-            set(props) { this.props += mapOf("text" to text) }
-        },
-        content = content
-    )
-}
-
-@Composable
-fun Button(label: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
-    ComposeNode<WidgetNode, WidgetTreeApplier>(
-        factory = {
-            WidgetNode("unformatted-text", props)
-        },
-        update = {
-            set(props) { this.props += mapOf("label" to label) }
-        },
-        content = content
-    )
-}
-
-fun buildWidgetTree(): WidgetNode {
+fun buildWidgetTree() {
     val root = WidgetNode("root")
+    registerWidget(root.id, root)
+
     val applier = WidgetTreeApplier(root)
     val composition = Composition(applier, Recomposer(MainScope().coroutineContext))
 
     composition.setContent {
         Node {
             UnformattedText("Hello, world!")
+            Button("Click here!")
         }
     }
-
-    return root
 }
-
-
-
-@Composable
-fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
-    ComposeNode<WidgetNode, WidgetTreeApplier>(
-        factory = { WidgetNode(type, props) },
-        update = {
-//            set(type) { this.type = type }
-            set(props) { this.props = props }
-        },
-        content = content
-    )
-}
-
-
 
 // Main function defined outside the class
 fun main() {
