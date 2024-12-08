@@ -1,11 +1,14 @@
 package dev.xframes
 
 import androidx.compose.runtime.*
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.util.concurrent.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.coroutines.CoroutineContext
 
 @JsonClass(generateAdapter = true)
@@ -56,20 +59,52 @@ class XFramesWrapper {
     }
 }
 
+private var lastWidgetId: Int = 0
+
+private val lock = ReentrantLock()
+
+val widgetRegistry = mutableMapOf<Int, WidgetNode>()
+
+fun getWidgetById(id: Int): WidgetNode? {
+    return widgetRegistry[id]
+}
+
+// Update registry when widgets are created or updated
+fun registerWidget(id: Int, widget: WidgetNode) {
+    widgetRegistry[id] = widget
+}
+
+// Function to get the next widget ID
+fun getNextWidgetId(): Int {
+    lock.lock() // Acquire the lock
+    try {
+        return lastWidgetId++
+    } finally {
+        lock.unlock() // Ensure the lock is released
+    }
+}
+
+@JsonClass(generateAdapter = true)
 data class WidgetNode(
-    var type: String,
+    val type: String,
     var props: Map<String, Any?> = emptyMap(),
-    val children: MutableList<WidgetNode> = mutableListOf()
+    var children: MutableList<WidgetNode> = mutableListOf(),
+    @Json
+    val id: Int = getNextWidgetId()
 )
 
 class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
+    val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    val widgetNodeAdapter = moshi.adapter(WidgetNode::class.java)
+
     override fun onClear() {
         println("onClear")
         current.children.clear()
     }
 
     override fun insertBottomUp(index: Int, instance: WidgetNode) {
-        println("insertBottomUp")
+        val widgetNodeJson = widgetNodeAdapter.toJson(instance)
+        println("insertBottomUp: $widgetNodeJson")
         current.children.add(index, instance)
     }
 
@@ -92,12 +127,35 @@ class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
 }
 
 @Composable
-fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+fun Node(props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
     ComposeNode<WidgetNode, WidgetTreeApplier>(
-        factory = { WidgetNode(type, props) },
+        factory = { WidgetNode("node", props) },
         update = {
-            set(type) { this.type = type }
             set(props) { this.props = props }
+        },
+        content = content
+    )
+}
+
+@Composable
+fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    ComposeNode<WidgetNode, WidgetTreeApplier>(
+        factory = { WidgetNode("unformatted-text", props) },
+        update = {
+            set(props) { this.props += mapOf("text" to text) }
+        },
+        content = content
+    )
+}
+
+@Composable
+fun Button(label: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    ComposeNode<WidgetNode, WidgetTreeApplier>(
+        factory = {
+            WidgetNode("unformatted-text", props)
+        },
+        update = {
+            set(props) { this.props += mapOf("label" to label) }
         },
         content = content
     )
@@ -109,8 +167,8 @@ fun buildWidgetTree(): WidgetNode {
     val composition = Composition(applier, Recomposer(MainScope().coroutineContext))
 
     composition.setContent {
-        WidgetNodeComposable("Container") {
-            WidgetNodeComposable("Button", mapOf("text" to "Click Me"))
+        Node {
+            UnformattedText("Hello, world!")
         }
     }
 
@@ -118,6 +176,18 @@ fun buildWidgetTree(): WidgetNode {
 }
 
 
+
+@Composable
+fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    ComposeNode<WidgetNode, WidgetTreeApplier>(
+        factory = { WidgetNode(type, props) },
+        update = {
+//            set(type) { this.type = type }
+            set(props) { this.props = props }
+        },
+        content = content
+    )
+}
 
 
 
