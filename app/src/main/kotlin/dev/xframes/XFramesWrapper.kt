@@ -2,14 +2,13 @@ package dev.xframes
 
 import androidx.compose.runtime.*
 import com.squareup.moshi.Json
+import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.util.concurrent.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.locks.ReentrantLock
-import kotlin.coroutines.CoroutineContext
 
 @JsonClass(generateAdapter = true)
 data class FontDefinition(val name: String, val size: Int)
@@ -24,8 +23,11 @@ data class ColorValue(val color: String, val alpha: Int)
 data class Theme(val colors: Map<Int, List<Any>>)
 
 class XFramesWrapper {
+    external fun getStyle(): String
     external fun setElement(elementJson: String)
     external fun setChildren(parentId: Int, childrenJson: String)
+    external fun elementInternalOp(id: Int, data: String)
+    external fun appendTextToClippedMultiLineTextRenderer(id: Int, text: String)
     external fun init(
         assetsBasePath: String,
         rawFontDefinitions: String,
@@ -59,28 +61,132 @@ class XFramesWrapper {
     }
 }
 
-private var lastWidgetId: Int = 0
+data class JsonSetData(val op: String, val data: Any)
+data class JsonSetValue(val op: String, val value: String)
+data class JsonSetSelectedIndex(val op: String, val index: Int)
+data class JsonResetData(val op: String)
+data class JsonAppendData(val op: String, val data: Any)
+data class JsonAppendDataToPlotLine(val op: String, val x: Float, val y: Float)
+data class JsonSetAxesDecimalDigits(val op: String, val x: Float, val y: Float)
+data class JsonSetAxesAutoFit(val op: String, val enabled: Boolean)
 
-private val lock = ReentrantLock()
+object widgetRegistrationService {
+    val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    val jsonAdapterSetData: JsonAdapter<JsonSetData> = moshi.adapter(JsonSetData::class.java)
+    val jsonAdapterSetSelectedIndex: JsonAdapter<JsonSetSelectedIndex> = moshi.adapter(JsonSetSelectedIndex::class.java)
+    val jsonAdapterSetValue: JsonAdapter<JsonSetValue> = moshi.adapter(JsonSetValue::class.java)
+    val jsonAdapterResetData: JsonAdapter<JsonResetData> = moshi.adapter(JsonResetData::class.java)
+    val jsonAdapterAppendData: JsonAdapter<JsonAppendData> = moshi.adapter(JsonAppendData::class.java)
+    val jsonAdapterAppendDataToPlotLine: JsonAdapter<JsonAppendDataToPlotLine> = moshi.adapter(JsonAppendDataToPlotLine::class.java)
+    val jsonAdapterSetAxesDecimalDigits: JsonAdapter<JsonSetAxesDecimalDigits> = moshi.adapter(JsonSetAxesDecimalDigits::class.java)
+    val jsonAdapterSetAxesAutoFit: JsonAdapter<JsonSetAxesAutoFit> = moshi.adapter(JsonSetAxesAutoFit::class.java)
 
-val widgetRegistry = mutableMapOf<Int, WidgetNode>()
+    private lateinit var xFramesWrapper: XFramesWrapper
 
-fun getWidgetById(id: Int): WidgetNode? {
-    return widgetRegistry[id]
-}
+    private var lastWidgetId: Int = 0
 
-// Update registry when widgets are created or updated
-fun registerWidget(id: Int, widget: WidgetNode) {
-    widgetRegistry[id] = widget
-}
+    private val idGeneratorLock = ReentrantLock()
+    private val idRegistrationLock = ReentrantLock()
 
-// Function to get the next widget ID
-fun getNextWidgetId(): Int {
-    lock.lock() // Acquire the lock
-    try {
-        return lastWidgetId++
-    } finally {
-        lock.unlock() // Ensure the lock is released
+    val widgetRegistry = mutableMapOf<Int, WidgetNode>()
+
+    val onClickRegistry = mutableMapOf<Int, () -> Unit>()
+
+    fun setXFramesWrapper(wrapper: XFramesWrapper) {
+        this.xFramesWrapper = wrapper
+    }
+
+    fun getWidgetById(id: Int): WidgetNode? {
+        return widgetRegistry[id]
+    }
+
+    // Update registry when widgets are created or updated
+    fun registerWidget(id: Int, widget: WidgetNode) {
+        idRegistrationLock.lock()
+        widgetRegistry[id] = widget
+        idRegistrationLock.unlock()
+    }
+
+    // Function to get the next widget ID
+    fun getNextWidgetId(): Int {
+        idGeneratorLock.lock() // Acquire the lock
+        try {
+            return lastWidgetId++
+        } finally {
+            idGeneratorLock.unlock() // Ensure the lock is released
+        }
+    }
+
+    fun registerWidgetForOnClickEvent(id: Int, fn: () -> Unit) {
+        this.onClickRegistry[id] = fn;
+    }
+
+    fun dispatchOnClickEvent(id: Int) {
+        this.onClickRegistry[id]?.let { it() };
+    }
+
+    fun getStyle(): String {
+        return this.xFramesWrapper.getStyle()
+    }
+
+    fun setData(id: Int, data: ArrayList<Any>) {
+        val jsonData = JsonSetData("setData", data)
+        jsonAdapterSetData.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun appendData(id: Int, data: ArrayList<Any>) {
+        val jsonData = JsonAppendData("appendData", data)
+        jsonAdapterAppendData.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun resetData(id: Int) {
+        val jsonData = JsonResetData("resetData")
+        jsonAdapterResetData.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun appendDataToPlotLine(id: Int, x: Float, y: Float) {
+        val jsonData = JsonAppendDataToPlotLine("appendData", x, y)
+        jsonAdapterAppendDataToPlotLine.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun setPlotLineAxesDecimalDigits(id: Int, x: Float, y: Float) {
+        val jsonData = JsonSetAxesDecimalDigits("setAxesDecimalDigits", x, y)
+        jsonAdapterSetAxesDecimalDigits.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun setAxisAutoFitEnabled(id: Int, enabled: Boolean) {
+        val jsonData = JsonSetAxesAutoFit("setAxesAutoFit", enabled)
+        jsonAdapterSetAxesAutoFit.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun appendTextToClippedMultiLineTextRenderer(id: Int, text: String) {
+        this.xFramesWrapper.appendTextToClippedMultiLineTextRenderer(id, text)
+    }
+
+    fun setInputTextValue(id: Int, value: String) {
+        val jsonData = JsonSetValue("setValue", value)
+        jsonAdapterSetValue.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
+    }
+
+    fun setComboSelectedIndex(id: Int, index: Int) {
+        val jsonData = JsonSetSelectedIndex("setSelectedIndex", index)
+        jsonAdapterSetSelectedIndex.toJson(jsonData)?.let {
+            this.xFramesWrapper.elementInternalOp(id, it)
+        }
     }
 }
 
@@ -90,7 +196,7 @@ data class WidgetNode(
     var props: Map<String, Any?> = emptyMap(),
     var children: MutableList<WidgetNode> = mutableListOf(),
     @Json
-    val id: Int = getNextWidgetId()
+    val id: Int = widgetRegistrationService.getNextWidgetId()
 )
 
 class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
@@ -104,13 +210,6 @@ class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
     override fun insertBottomUp(index: Int, instance: WidgetNode) {}
 
     override fun insertTopDown(index: Int, instance: WidgetNode) {
-        val parent = getWidgetById(index)
-        val widgetNodeJson = widgetNodeAdapter.toJson(instance)
-        val parentJson = widgetNodeAdapter.toJson(parent)
-        println("insertTopDown: $index $parentJson $widgetNodeJson")
-////        println(Thread.currentThread().stackTrace.joinToString("\n"))
-//        current.children.add(index, instance)
-
         current.children.add(index, instance)
     }
 
@@ -124,6 +223,8 @@ class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
 
     override fun onBeginChanges() {
         super.onBeginChanges()
+
+        // Might be useful/necessary
     }
 
     override fun onEndChanges() {
@@ -153,12 +254,19 @@ fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap()) {
 }
 
 @Composable
-fun Button(label: String, props: Map<String, Any?> = emptyMap()) {
+fun Button(label: String, onClick: () -> Unit = {}, props: Map<String, Any?> = emptyMap()) {
     println("Button recomposed")
+
+    val node = WidgetNode("button", props)
+    widgetRegistrationService.registerWidget(node.id, node)
+
+    if (onClick != {}) {
+        widgetRegistrationService.registerWidgetForOnClickEvent(node.id, onClick)
+    }
 
     val updatedProps = remember { props + mapOf("label" to label) }
 
-    WidgetNodeComposable("button", updatedProps)
+    WidgetNodeComposable(node, updatedProps)
 }
 
 @Composable
@@ -166,8 +274,21 @@ fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), co
     ComposeNode<WidgetNode, WidgetTreeApplier>(
         factory = {
             val node = WidgetNode(type, props)
-            registerWidget(node.id, node)
+            widgetRegistrationService.registerWidget(node.id, node)
 
+            node
+        },
+        update = {
+            set(props) { this.props = props }
+        },
+        content = content
+    )
+}
+
+@Composable
+fun WidgetNodeComposable(node: WidgetNode, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    ComposeNode<WidgetNode, WidgetTreeApplier>(
+        factory = {
             node
         },
         update = {
@@ -179,7 +300,7 @@ fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), co
 
 fun buildWidgetTree() {
     val root = WidgetNode("root")
-    registerWidget(root.id, root)
+    widgetRegistrationService.registerWidget(root.id, root)
 
     val applier = WidgetTreeApplier(root)
     val composition = Composition(applier, Recomposer(MainScope().coroutineContext))
