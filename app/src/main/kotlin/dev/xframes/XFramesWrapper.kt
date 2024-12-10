@@ -1,10 +1,7 @@
 package dev.xframes
 
 import androidx.compose.runtime.*
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.JsonClass
-import com.squareup.moshi.Moshi
+import com.squareup.moshi.*
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.util.concurrent.*
 import kotlinx.coroutines.*
@@ -190,7 +187,7 @@ object widgetRegistrationService {
     }
 }
 
-@JsonClass(generateAdapter = true)
+@JsonClass(generateAdapter = false)
 data class WidgetNode(
     val type: String,
     var props: Map<String, Any?> = emptyMap(),
@@ -199,9 +196,28 @@ data class WidgetNode(
     val id: Int = widgetRegistrationService.getNextWidgetId()
 )
 
-class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
+class WidgetNodeAdapter  {
+    @FromJson
+    fun fromJson(json: Map<String, Any?>): WidgetNode {
+        val type = json["type"] as String
+        val id = json["id"] as Int
+        val props = json - "id" - "type"
+
+        return WidgetNode(type = type, props = props, id = id)
+    }
+
+    @ToJson
+    fun toJson(widgetNode: WidgetNode): Map<String, Any?> {
+        return widgetNode.props + mapOf(
+            "id" to widgetNode.id,
+            "type" to widgetNode.type,
+        )
+    }
+}
+
+class WidgetTreeApplier(val xframes: XFramesWrapper, val jsonAdapter: JsonAdapter<WidgetNode>, root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
     val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-    val widgetNodeAdapter = moshi.adapter(WidgetNode::class.java)
+    val childrenAdapter = moshi.adapter(List::class.java).lenient()
 
     override fun onClear() {
         root.children.clear()
@@ -211,6 +227,9 @@ class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
 
     override fun insertTopDown(index: Int, instance: WidgetNode) {
         current.children.add(index, instance)
+
+        xframes.setElement(jsonAdapter.toJson(instance))
+        xframes.setChildren(current.id, childrenAdapter.toJson(listOf(instance.id)))
     }
 
     override fun move(from: Int, to: Int, count: Int) {
@@ -230,24 +249,20 @@ class WidgetTreeApplier(root: WidgetNode) : AbstractApplier<WidgetNode>(root) {
     override fun onEndChanges() {
         super.onEndChanges()
 
-        val rootJson = widgetNodeAdapter.toJson(root)
-        println("done: $rootJson")
+//        val rootJson = adapter.toJson(root)
+//        println("done: $rootJson")
     }
 }
 
 @Composable
-fun Node(props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
-    println("Node recomposed")
-
-    val updatedProps = remember { props }
+fun Node(root: Boolean? = null, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
+    val updatedProps = remember { props + mapOf("root" to root) }
 
     WidgetNodeComposable("node", updatedProps, content)
 }
 
 @Composable
 fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap()) {
-    println("UnformattedText recomposed")
-
     val updatedProps = remember { props + mapOf("text" to text) }
 
     WidgetNodeComposable("unformatted-text", updatedProps)
@@ -255,16 +270,14 @@ fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap()) {
 
 @Composable
 fun Button(label: String, onClick: () -> Unit = {}, props: Map<String, Any?> = emptyMap()) {
-    println("Button recomposed")
+    val updatedProps = remember { props + mapOf("label" to label) }
 
-    val node = WidgetNode("button", props)
+    val node = WidgetNode("button", updatedProps)
     widgetRegistrationService.registerWidget(node.id, node)
 
     if (onClick != {}) {
         widgetRegistrationService.registerWidgetForOnClickEvent(node.id, onClick)
     }
-
-    val updatedProps = remember { props + mapOf("label" to label) }
 
     WidgetNodeComposable(node, updatedProps)
 }
@@ -286,6 +299,14 @@ fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), co
 }
 
 @Composable
+fun App() {
+    Node {
+        UnformattedText("Hello, world!!!")
+//        Button("Click here!")
+    }
+}
+
+@Composable
 fun WidgetNodeComposable(node: WidgetNode, props: Map<String, Any?> = emptyMap(), content: @Composable () -> Unit = {}) {
     ComposeNode<WidgetNode, WidgetTreeApplier>(
         factory = {
@@ -298,28 +319,22 @@ fun WidgetNodeComposable(node: WidgetNode, props: Map<String, Any?> = emptyMap()
     )
 }
 
-fun buildWidgetTree() {
-    val root = WidgetNode("root")
-    widgetRegistrationService.registerWidget(root.id, root)
-
-    val applier = WidgetTreeApplier(root)
-    val composition = Composition(applier, Recomposer(MainScope().coroutineContext))
-
-    composition.setContent {
-        Node {
-            UnformattedText("Hello, world!")
-            Button("Click here!")
-        }
-    }
-}
-
 // Main function defined outside the class
 fun main() {
-    buildWidgetTree()
+    val moshi = Moshi.Builder()
+        .add(WidgetNodeAdapter())
+        .build()
+    val jsonAdapter = moshi.adapter(WidgetNode::class.java)
 
     val xframes = XFramesWrapper()
 
-    MyCallbackHandler.initialize(xframes)
+    val root = WidgetNode("node", mapOf("root" to true))
+    widgetRegistrationService.registerWidget(root.id, root)
+
+    val applier = WidgetTreeApplier(xframes, jsonAdapter, root)
+    val composition = Composition(applier, Recomposer(MainScope().coroutineContext))
+
+    MyCallbackHandler.initialize(xframes, jsonAdapter, composition) { App() }
 
     // Initialize with paths and callbacks
     xframes.init("../assets", getFontDefinitions(), getStyleOverrides(), MyCallbackHandler)
