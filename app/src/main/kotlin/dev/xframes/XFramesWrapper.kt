@@ -272,7 +272,7 @@ fun UnformattedText(text: String, props: Map<String, Any?> = emptyMap()) {
 fun Button(label: String, onClick: () -> Unit = {}, props: Map<String, Any?> = emptyMap()) {
     val updatedProps = remember { props + mapOf("label" to label) }
 
-    val node = WidgetNode("button", updatedProps)
+    val node = WidgetNode("di-button", updatedProps)
     widgetRegistrationService.registerWidget(node.id, node)
 
     if (onClick != {}) {
@@ -302,7 +302,7 @@ fun WidgetNodeComposable(type: String, props: Map<String, Any?> = emptyMap(), co
 fun App() {
     Node {
         UnformattedText("Hello, world!!!")
-//        Button("Click here!")
+        Button("Click here!")
     }
 }
 
