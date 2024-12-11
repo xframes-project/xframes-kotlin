@@ -1,55 +1,28 @@
 package dev.xframes
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Composition
 import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.JsonClass
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-
-@JsonClass(generateAdapter = true)
-data class Node(
-    val id: Int,
-    val type: String,
-    val root: Boolean? = null,
-    val text: String? = null
-)
 
 object MyCallbackHandler : AllCallbacks {
     lateinit var xframes: XFramesWrapper
+    lateinit var composition: Composition
+    lateinit var App: @Composable () -> Unit
+    lateinit var jsonAdapter: JsonAdapter<WidgetNode>
 
     // Initialization block for singleton setup
-    fun initialize(xframesWrapper: XFramesWrapper) {
-        xframes = xframesWrapper
+    fun initialize(xframesWrapper: XFramesWrapper, jsonAdapter: JsonAdapter<WidgetNode>, composition: Composition, App: @Composable () -> Unit) {
+        this.xframes = xframesWrapper
+        this.composition = composition
+        this.App = App
+        this.jsonAdapter = jsonAdapter
     }
 
     override fun onInit() {
-        println("Initialization callback called!")
+        xframes.setElement(jsonAdapter.toJson(widgetRegistrationService.getWidgetById(0)))
 
-        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-
-        val nodeAdapter = moshi.adapter(Node::class.java)
-        val childrenAdapter = moshi.adapter(List::class.java).lenient()
-
-        val rootNode = Node(
-            id = 0,
-            type = "node",
-            root = true
-        )
-        val rootNodeJson = nodeAdapter.toJson(rootNode)
-
-        val textNode = Node(
-            id = 1,
-            type = "unformatted-text",
-            text = "Hello, world!"
-        )
-        val textNodeJson = nodeAdapter.toJson(textNode)
-
-        val children = listOf(1)
-        val childrenJson = childrenAdapter.toJson(children)
-
-        xframes.setElement(rootNodeJson)
-        xframes.setElement(textNodeJson)
-        if (childrenJson != null) {
-            xframes.setChildren(0, childrenJson)
+        composition.setContent {
+            App()
         }
     }
 
